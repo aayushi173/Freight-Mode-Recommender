@@ -1,0 +1,736 @@
+<!DOCTYPE html>
+<html lang="en">
+<customHeaders>
+    <clear />
+    <add name="Access-Control-Allow-Origin" value="*" />
+</customHeaders>
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Freight Mode Recommender</title>
+    <script src="./js/mapdata_na.js"></script>
+    <script src="./js/namap.js"></script>
+    <script src="./js/mapdata_mx.js"></script>
+    <script src="./js/countrymap.js"></script>
+    <script src="./js/select.js"></script>
+    <script type="text/javascript" src="https://d3js.org/d3.v5.min.js"></script>
+	<script type="text/javascript" src="https://d3js.org/d3-dsv.v1.min.js"></script>
+    <script src="https://ajax.googleapis.com/ajax/libs/jquery/1.12.4/jquery.min.js"></script>
+    <link rel="stylesheet" type="text/css" href="css/bootstrap.min.css" />
+    <script src="./js/bootstrap.min.js"></script>
+   
+    <!-- sql.js is used to read from SQLite database -->
+    <script src='/dist/sql-wasm.js'></script>
+
+    <style>
+        svg {
+            width: 100%;
+            height: auto;
+        }
+        .header {
+            display: flex;
+        }
+        .region {
+            fill: #ddd;
+            stroke: #333;
+            stroke-width: 2;
+            cursor: pointer;
+            transition: fill 0.3s ease;
+        }
+        .region:hover {
+            fill: #f39c12;
+        }
+        .selected {
+            fill: #3498db !important;
+        }
+        #map-container {
+            width: 70vw;
+            height: 70vh;
+            max-width: 700px;
+            position: relative;
+            border: 2px;
+            border-color: #333;
+            display: inline-block;
+        }
+        #chart-container {
+            width: 70vw;
+            height: 50vh;
+            position: relative;
+            border: 2px;
+            border-color: #333;
+        }
+        #origin-tab {
+            margin-top: 20px;
+        }
+        /* define CSS rules here - from Dropdown html */
+        body {
+            font-family: Arial, sans-serif;
+            padding: 20px;
+            background-color:#ddd
+        }
+       .dropdown-container {
+            display: flex;
+            align-items: center;
+            margin-bottom: 1px;
+            height: 5px;
+        }
+        label {
+            font-size: 12px;
+            margin-right: 5px;
+            text-align: left;
+        }
+        select {
+            font-size: 12px;
+            padding: 10px;
+        }
+		 /* Container for the input fields */
+        .input-container {
+            display: flex; /* Use flexbox for horizontal alignment */
+			align-items: center; /* Vertically center the label and input */
+			margin-bottom: 1px; /* Adds space between the fields */
+        }
+        /* Label styling */
+        .input-container label {
+            font-size: 12px;
+			margin-right: 10px; /* Adds space between the label and input */
+			width: 200px; /* Set a fixed width for labels */
+			text-align: left; /* Ensures the label text is aligned to the left */
+        }
+        /* Input field styling */
+        .input-container input {
+            flex-grow: 1;
+            padding: 1px;
+            width: 100px;
+            font-size: 12px;
+            border: 1px solid #ccc;
+            border-radius: 1px;
+        }
+    </style>
+</head>
+
+<body>
+    <!-- Add heading for the visualization -->
+    <div id="head" class="mt-4 p-5 bg-primary text-white rounded text-center">
+        <h1>Freight Mode Recommendation System</h1>
+    <p>Team 109:  Brandon Azar, Kanish Jayawardene, Nancy Givens, Aayushi Patel, Kenechukwu Nduagubam </p>
+    </div>
+   <!-- Create dropdown elements with labels here -->
+<form>  
+    <div class="container-fluid">
+        <div id="Commodity-tab">
+            <label for="DropdownCOMMODITY2">Commodity</label>
+            <select id="DropdownCOMMODITY2" style="width: 1300px;" class="input-sm">
+                <!-- Options will be populated dynamically using D3 -->
+            </select>
+        </div>
+        <div class="row">
+            <div class="col-lg-3" >
+                <table >								
+                    <tr>
+                        <td <label for="origin">Mexican State/Canadian Prov:  </label></td>
+                        <td><input type="text" id="origin" placeholder="Select on map" autocomplete="off"></td>
+                    </tr>
+                    <tr>
+                        <td <label for="destination">US State:</label></td>
+                        <td><input type="text" id="destination" placeholder="Select on map" autocomplete="off"></td>
+                    </tr>
+                    <tr>
+                        <td <label for="DropdownDF">Direction of Shipment</label></td>
+                        <td><select id="DropdownDF" class="input-sm">
+                            <!-- Options for DF will be populated dynamically -->
+                        </select></td>
+                    </tr>
+                </table>
+            </div>
+            <div class="col-lg-3">
+                <table >								
+                    <tr>
+                        <td <label for="SHIPWT">Shipping Weight (kg)</label></td>
+                        <td><input type="number" id="SHIPWT" placeholder="Enter weight in kg"></td>
+                    </tr>
+                    <tr>
+                        <td <label for="FREIGHT_CHARGES">Freight Charges (USD)</label></td>
+                        <td><input type="number" id="FREIGHT_CHARGES" placeholder="Enter freight charges in USD"></td>
+                    </tr>
+                    <tr>
+                        <td <label for="VALUE">Value of Goods (USD)</label></td>
+                        <td><input type="number" id="VALUE" placeholder="Enter value in USD"></td>
+                    </tr>
+                </table>
+            </div>
+            <div class="col-lg-3">
+                <table >								
+                    <tr>
+                        <td <label for="DropdownMonth">Month</label></td>
+                        <td><select id="DropdownMonth" class="input-sm">
+                            <!-- Month options will be populated dynamically -->
+                        </select></td>
+                    </tr>
+                    <tr>
+                        <td <label for="DropdownYear">Year</label></td>
+                        <td><select id="DropdownYear" class="input-sm">
+                            <!-- Year options will be populated dynamically -->
+                        </select></td>
+                    </tr>
+                    <tr>
+                        <td <label for="DropdownContCode">In a shipping container?</label></td>
+                        <td><select id="DropdownContCode" class="input-sm">
+                            <!-- Options for Container Code will be populated dynamically -->
+                        </select></td>
+                    </tr>
+                </table>
+            </div>
+            <div class="col-lg-4" align="center">
+                <input id="SubmitButton" type="button" value="Get Recommendation" class="btn btn-success"  style="margin-right: 4em"/>     <input id="resetButton" type="reset" value="Reset" class="btn btn-secondary"/>
+            </div>
+            <div class="col-lg-4" align="center">
+                <label for="recommendation">Recommended Freight Mode:</label><input id="recommendation" type="text" value="" readonly><img id=myImage src=" " class="img-rounded" alt=" " width="60" height="60" style="vertical-align:middle"/>
+            </div>
+        </div>
+    </div>  
+    <br>
+    </form> 
+    
+
+    <!-- Map Container -->
+    <div id="map-controls">
+        <button id="switch-to-us">Switch to US Map</button>
+        <button id="switch-to-mexico">Switch to Mexico Map</button>
+    </div>
+    
+        <div class="col-lg-5" >
+            <div id="map-container">
+                <div id="map" style="border: 1px solid black"></div>
+            </div>
+        </div>
+        <div class="col-lg-6" id="chart-container-div" display="none">
+            <h3>Historical Transport Modes For Commodity and Shipping Direction</h3>
+            <div id="chart-container">
+                <div id="barchart" ></div>
+            </div>
+        </div>
+
+    <script>
+        // ----------------Script for maps-----------------------
+        
+        // Initialize the map object
+        simplemaps_select.map = simplemaps_namap; // Default to US map
+        simplemaps_select.max = 1; // Only one state can be selected at a time
+
+        // Function to reset the map and clear any selected states
+        function resetMap(map) {
+            simplemaps_select.map = map;
+            if (simplemaps_select.selected) {
+                simplemaps_select.selected = null; // Clear any selected state
+            }
+            simplemaps_select.refresh(); // Refresh the map to apply changes
+        }
+
+        // Event listeners for switching maps
+        document.getElementById('switch-to-us').addEventListener('click', function () {
+            resetMap(simplemaps_namap); // Switch to US map
+        });
+
+        document.getElementById('switch-to-mexico').addEventListener('click', function () {
+            resetMap(simplemaps_mxmap); // Switch to Mexico map
+        });
+
+        //--------------End script for maps-------------------
+
+        
+
+        //----------------code for hiding bar chart div on page load--------------
+        var shouldRemoveSVG = 0
+        window.onload = function() {
+            document.getElementById("chart-container-div").style.display = "none";
+        }
+        //------------------------------------------------------------------
+        
+
+        // ------------Event listeners for resetting image------------------
+        document.getElementById('resetButton').addEventListener('click', function () {
+            document.getElementById("myImage").src = " ";
+            document.getElementById("myImage").alt = " ";
+            document.getElementById("chart-container-div").style.display = "none";
+            removeSVG(shouldRemoveSVG=0)
+            window.location.reload();
+            
+        });
+
+        // -----------Function to clear bar chart----------------
+        function removeSVG(shouldRemoveSVG){
+            var svgContainer = d3.select("bar-chart");
+
+            if (shouldRemoveSVG) {
+                svgContainer.selectAll("svg").remove(); // Solution 1: Remove existing SVG elements
+                console.log("got here-remove");
+            } else {
+                svgContainer.select("svg").html(""); // Solution 2: Clear content of the first SVG element
+                console.log("got here-clear");
+            }
+        };
+
+        // -----------Function to get recommendation from API----------------
+        function getRecommendation(URLstring) {
+            const apiUrl = URLstring;
+            removeSVG(shouldRemoveSVG=0)
+            
+            // Make a GET request
+            fetch(apiUrl)
+            .then(response => {
+                if (!response.ok) {
+                throw new Error('Network response was not ok');
+                }
+                return response.json();
+            })
+            .then(data => {
+                // console.log("mode=",data.mode,typeof data.mode);
+                
+                document.getElementById("recommendation").value = data.mode;
+
+                if (data.mode == "Air") {
+                    // console.log("here");
+                    document.getElementById("myImage").src = "./images/airplane.jpeg";
+                    document.getElementById("myImage").alt = "AIR";
+                } else if (data.mode == 'Vessel'){
+                    // console.log("here2");
+                    document.getElementById("myImage").src = "./images/ship.jpeg";
+                    document.getElementById("myImage").alt = "VESSEL";
+                } else if (data.mode == 'USPS'){
+                    document.getElementById("myImage").src = "./images/usps.jpeg";
+                    document.getElementById("myImage").alt = "USPS";
+                } else if (data.mode == 'Truck'){
+                    document.getElementById("myImage").src = "./images/truck.jpeg";
+                    document.getElementById("myImage").alt = "TRUCK";
+                } else if (data.mode == 'Rail'){
+                    document.getElementById("myImage").src = "./images/rail.jpeg";
+                    document.getElementById("myImage").alt = "RAIL";
+                } else if (data.mode == 'Pipeline'){
+                    document.getElementById("myImage").src = "./images/pipeline.jpeg";
+                    document.getElementById("myImage").alt = "PIPELINE";
+                } else if (data.mode == 'FTZs'){
+                    document.getElementById("myImage").src = "./images/ftz.jpeg";
+                    document.getElementById("myImage").alt = "FREE TRADE";
+                } else {
+                    document.getElementById("myImage").src = "./images/other.jpeg";
+                    document.getElementById("myImage").alt = "OTHER";
+                }  
+            })
+            .catch(error => {
+                console.log(response.json());
+                console.error('Error:', error);
+            });
+        };
+
+    //---------------Function to get data from SQLite table--------------------
+    // The `initSqlJs` function is globally provided by all of the main dist files if loaded in the browser.
+    // We must specify this locateFile function if we are loading a wasm file from anywhere other than the current html page's folder.
+        function getSQLdata(MexCan,USstate,Commodity,DF,ShipWt) {
+            initSqlJs(config).then(function(SQL){
+                //delete any previous charts before rebuilding
+                
+                
+                let xhr = new XMLHttpRequest();
+                xhr.open('GET', '/dbfiles/project.db', true);
+                xhr.responseType = 'arraybuffer';
+                var CommodityNum = parseInt(Commodity,0);
+                var DFNum = parseInt(DF,0);
+                var ShipMax=ShipWt*1.5;
+                var ShipMin=ShipWt*0.5;
+                // Code	Description
+                //let result={'Air': 0, 'Vessel': 0, 'Mail(USPS)':0, 'Truck':0, 'Rail':0, 'Pipeline':0, 'Other':0, 'ForeignTradeZone':0};
+                console.log(MexCan,USstate,CommodityNum,DF,ShipWt, typeof CommodityNum);
+                xhr.onload = function(e) {
+                    let uInt8Array = new Uint8Array(this.response);
+                    let db = new SQL.Database(uInt8Array);
+                    //table = dot3
+                    //['id', 'TRDTYPE', 'DEPE', 'COMMODITY2', 'DISAGMOT', 'COUNTRY', 'VALUE', 'SHIPWT', 'FREIGHT_CHARGES', 'DF', 'CONTCODE', 'MONTH', 'YEAR']
+                    SQLstring1="Select DISAGMOT,count(*) as [COUNT] from dot3 WHERE (COMMODITY2 = ";  //CommodityNum
+                    SQLstring2=" AND DF = ";  //DFnum
+                    SQLstring3=" AND SHIPWT > "; //ShipMin
+                    SQLstring4=" AND SHIPWT < ";  //ShipMax
+                    SQLstring5=") GROUP BY DISAGMOT order by DISAGMOT";
+                    query_text=SQLstring1.concat(CommodityNum,SQLstring2,DFNum,SQLstring5);
+                    console.log(query_text)
+                    let contents = db.exec(query_text);
+                    //let contents = db.exec("SELECT disagmot, count(*) as [COUNT] FROM dot3 WHERE COMMODITY2 = 87 GROUP BY disagmot");
+                    //commodity, df, +/-20 shit wt---do this
+                    //console.log(contents[0]['values']);
+                    console.log(contents)
+                    let array_val = contents[0]['values'];
+                    console.log("array values=",array_val);
+                    
+                    var bardata = [];
+                    var type =" ";
+                    var count_max=0;
+                    for(i=0; i<array_val.length; i++){
+                        var count = array_val[i][1]
+                        if (count>count_max){count_max = count};
+                        if (array_val[i][0]=='1'){type='Vessel'};
+                        if (array_val[i][0]=='3'){type='Air'};
+                        if (array_val[i][0]=='4'){type='Mail(USPS)'};
+                        if (array_val[i][0]=='5'){type='Truck'};
+                        if (array_val[i][0]=='6'){type='Rail'};
+                        if (array_val[i][0]=='7'){type='Pipeline'};
+                        if (array_val[i][0]=='8'){type='Other'};
+                        if (array_val[i][0]=='9'){type='FreeTradeZone'};
+                        bardata.push({Type: type, Count: count});
+                    };
+                    var y_values = [];
+                    for (var i=0; i<bardata.length; i++){
+                        y_values.push(bardata[i]['Type']);
+                    };
+                    
+                    console.log(bardata, y_values,count_max);
+                    //console.log(result);
+                    //--------------Script for bar chart--------------------
+        
+                    var margin = {top: 30, right: 70, bottom: 30, left: 80};
+                    var width = 800 - margin.left - margin.right;
+                    var height = 370 - margin.top - margin.bottom;
+                    var color = d3.schemeCategory10;
+
+                    let svg2 = d3.select("#chart-container")
+                        .append("svg")
+                        .attr("class","bar_chart")
+                        .attr("id", "bar_chart")
+                        .attr("width", width + margin.left + margin.right)
+                        .attr("height", height + margin.top + margin.bottom)
+                        .append("g")
+                        .attr("id", "container_2")
+                        .attr("transform","translate(" + margin.left + "," + margin.top + ")");
+                        
+                        
+                    var bars = svg2.append("g")
+                        .attr("id", "bars"); 
+
+                    var x_axis_bars = svg2.append("g")
+                        .attr("id", "x-axis-bars"); 
+
+                    var y_axis_bars = svg2.append("g")
+                        .attr("id", "y-axis-bars");
+
+                    var bar_x_axis_label = svg2.append("text")
+                        .attr("id", "bar_x_axis_label");
+
+                    var bar_y_axis_label = svg2.append("text")
+                        .attr("id", "bar_y_axis_label");
+                    console.log(bardata.length);  
+                    for(var j = 0; j<bardata.length; j++){
+                        console.log(bardata[j].Count);
+                        } 
+                    var x_scale_bar = d3.scaleLinear().domain([0, count_max]).range([0, width]);
+                    var x_axis_bar = d3.axisBottom(x_scale_bar)
+                        .ticks(7);
+
+                    for(var j = 0; j<bardata.length; j++){
+                        bars.append("rect")
+                        .attr("x", 0)
+                        .attr("class", "bars")
+                        .attr("y", j*(height/bardata.length))
+                        .attr("height", 30)
+                        .attr("width", x_scale_bar(bardata[j]['Count']))
+                        .attr("fill", "steelblue")
+                        .style("opacity", 1)
+                        .attr("transform", "translate(75, 15)")
+                        }
+                    bar_x_axis_label.append("text")
+                        .attr("class", "bar_x_axis_label")
+                        .attr('x', margin.left + (width - margin.left - margin.right) / 2)
+                        .attr('y', height+margin.top) // Relative to the x axis.
+                        .attr("text-anchor", "end")
+                        .style("fill", "black")
+                        .text("Number of Shipments")
+                        .style("opacity", 1);
+                        
+                    bar_y_axis_label.append("text")
+                        .attr("class", "bar_y_axis_label")
+                        .attr("y",-(margin.left/2))
+                        .attr("x",-(height/2))
+                        .attr("text-anchor", "end")
+                        .attr("transform", "rotate(-90)")
+                        .style("fill", "black")
+                        .text("Games")
+                        .style("opacity", 1);
+
+                    //     bar_title_text = "Top 5 Most Rated Games of"; //"+d.year + " with Rating "+d.rating";
+                    // //console.log(bar_title_text)
+                    // bar_chart_title.selectAll("text")
+                    //     .style("opacity", 1)
+                    //     .text("Historical transport modes for commodity and shipping weight");
+                    
+                    //var x_scale_bar = d3.scaleLinear().domain([0, d3.max(bardata.Count)]).range([0, width]);
+                    
+
+                    x_axis_bars.call(x_axis_bar)
+                        .attr("transform", "translate(75,"+ height + ")")
+                        .style("opacity", 1);
+                    // bar_x_axis_label.selectAll("text")
+                    //     .style("opacity", 1);
+                        
+                    //var y_scale_bar = d3.scaleBand().domain(d.name.map(function(n){return n;})).range([0,height]);
+                    var y_scale_bar = d3.scaleBand().domain(y_values).range([0,height]);
+                    var y_axis_bar = d3.axisLeft(y_scale_bar)
+                    
+                    y_axis_bars.call(y_axis_bar)
+                        .attr("transform", "translate(75, 0)")
+                        .style("opacity", 1);
+                    
+                    bar_y_axis_label.selectAll("text")
+                        .style("opacity", 1);
+
+                        
+                    // d3.select("#bar_chart")
+                    //     .selectAll("rect")
+                    //     .datum(bardata)
+                    //     .attr("x", 0)
+                    //     .attr("width", function(d){return bardata.Count})
+                    //     .style("opacity", 1);
+
+                    //----------------End of bar chart code --------------
+                    
+                };
+                xhr.send();
+            });
+        };
+
+        // Code	Description
+        // 1	Vessel
+        // 3	Air
+        // 4	Mail (U.S. Postal Service)
+        // 5	Truck
+        // 6	Rail
+        // 7	Pipeline
+        // 8	Other
+        // 9	Foreign Trade Zones (FTZs)
+
+        //------------------Input select box code----------------------
+        // define any other global variables
+        let MexCan = ""; // Default MexCan 
+        let USstate = "" ;
+		let Commodity = "87"; // Default commodity
+		let Month = "1"; 
+        let Year = "2025"; 
+		let DF = "1"; 
+        let ContCode = "X"; 
+        let ShipWt = "1000";
+        let FreightCharges = "999"; 
+        let Value = "999";
+        // let MexCan = "Aguascalientes"; // Default MexCan 
+        // let USstate = "Georgia" 
+		// let Commodity = "Aircraft, spacecraft, and parts thereof"; // Default commodity
+		// let Month = "1"; 
+        // let Year = "2024"; 
+		// let DF = "1"; 
+        // let ContCode = "X"; 
+        // let ShipWt = "1000";
+        // let FreightCharges = "57,912"; 
+        // let Value = "5,298,814";
+
+		const months = ["1", "2", "3", "4", "5", "6", "7", "8", "9", "10", "11", "12"];
+        const years = ["2026","2025","2024", "2023", "2022", "2021", "2020", "2019", "2018", "2017", "2016", "2015", "2014", "2013", "2012", "2011", "2010"]; 
+        const DFData = [
+			{ code: "1", description: "Export from US" },  // - Domestically produced merchandise
+			{ code: "2", description: "Import to US" }  //- Foreign produced merchandise
+		];
+		
+		const ContCodeData = [
+			{ code: "X", description: "In a Container" },
+			{ code: "0", description: "Not in a Container" }
+		];
+		
+        const DropdownMonth = d3.select("#DropdownMonth");
+        DropdownMonth.selectAll("option")
+            .data(months)
+            .enter().append("option")
+            .attr("value", d => d)
+            .text(d => d);
+        DropdownMonth.property("value", Month);
+
+        const DropdownYear = d3.select("#DropdownYear");
+        DropdownYear.selectAll("option")
+            .data(years)
+            .enter().append("option")
+            .attr("value", d => d)
+            .text(d => d);
+        DropdownYear.property("value", Year);
+
+        // ----------------Event listeners for dropdown changes---------------
+        DropdownMonth.on("change", function () {
+            Month = this.value; 
+            console.log("Selected Month:", Month);
+        });
+
+        DropdownYear.on("change", function () {
+            Year = this.value; 
+            console.log("Selected Year:", Year);
+        });
+
+        //-----------------Code to populate dropdown boxes -------------------
+        Promise.all([
+            // enter code to read files
+			d3.csv("./dbfiles/LegendCANMEX.csv"),
+            d3.csv("./dbfiles/LegendUSState.csv"),
+			d3.csv("./dbfiles/LegendCommodities.csv")
+			
+        ]).then(function (data) {
+            //console.log(data);
+            const MexCanData = data[0]; // MexCan Data
+            const USStateData = data[1]; // USstate Data
+            const CommoditiesData = data[2]; // Commodities Data
+
+			// Create a mapping from MEXSTATE_CANPROV_verbose to MEXSTATE_CANPROV
+            const MexCanMap = MexCanData.reduce((map, d) => {
+                map[d.MEXSTATE_CANPROV_verbose] = d.MEXSTATE_CANPROV;
+                return map;
+            }, {});
+			// Create a mapping from USASTATE_verbose to USASTATE
+			const USstateMap = USStateData.reduce((map, d) => {
+				map[d.USASTATE_verbose] = d.USASTATE;
+				return map;
+			}, {});
+			
+			// Create a mapping from COMMODITY2_verbose to COMMODITY2
+			const commodityMap = CommoditiesData.reduce((map, d) => {
+				map[d.COMMODITY2_verbose] = d.COMMODITY2;
+				return map;
+			}, {});
+			
+            // Extract required fields from MexCanData
+            const MexCans = Array.from(new Set(MexCanData.map(d => d.MEXSTATE_CANPROV_verbose))).sort((a, b) => a - b);
+            const USstates = Array.from(new Set(USStateData.map(d => d.USASTATE_verbose))).sort();
+            const Commodities = Array.from(new Set(CommoditiesData.map(d => d.COMMODITY2_verbose))).sort();
+
+            // Append options to dropdowns
+            const DropdownMexCan = d3.select("#origin");
+            DropdownMexCan.selectAll("option")
+                .data(MexCans)
+                .enter().append("option")
+                .attr("value", d => d)
+                .text(d => d);
+            DropdownMexCan.property("value", MexCan);
+
+            const DropdownUSstate = d3.select("#destination");
+            DropdownUSstate.selectAll("option")
+                .data(USstates)
+                .enter().append("option")
+                .attr("value", d => d)
+                .text(d => d);
+            DropdownUSstate.property("value", USstate);
+
+            const DropdownCommodity = d3.select("#DropdownCOMMODITY2");  //
+            DropdownCommodity.selectAll("option")
+                .data(Commodities)
+                .enter().append("option")
+                .attr("value", d => d)
+                .text(d => d);
+            DropdownCommodity.property("value", Commodity);
+
+			const DropdownDF = d3.select("#DropdownDF");
+			DropdownDF.selectAll("option")
+				.data(DFData)
+				.enter().append("option")
+				.attr("value", d => d.code)
+				.text(d => d.description);
+			DropdownDF.property("value", DF);
+	
+			const DropdownContCode = d3.select("#DropdownContCode");
+			DropdownContCode.selectAll("option")
+				.data(ContCodeData)
+				.enter().append("option")
+				.attr("value", d => d.code)
+				.text(d => d.description);
+			DropdownContCode.property("value", ContCode);
+
+            // -----------Event listeners for dropdown changes---------------
+            DropdownMexCan.on("change", function () {
+                const MEXSTATE_CANPROV_verbose = this.value; // Get the selected MEXSTATE_CANPROV_verbose
+                const MEXSTATE_CANPROV = MexCanMap[MEXSTATE_CANPROV_verbose]; // Get corresponding MEXSTATE_CANPROV
+                MexCan = MEXSTATE_CANPROV; // Update the MexCan variable with the MEXSTATE_CANPROV value
+                console.log("Selected Mexican State or Canadian Province:", MEXSTATE_CANPROV_verbose);
+                console.log("Selected MEXSTATE_CANPROV:", MEXSTATE_CANPROV);
+            });
+
+            DropdownUSstate.on("change", function () {
+				const USASTATE_verbose = this.value; // Get the selected USASTATE_verbose
+				const USASTATE = USstateMap[USASTATE_verbose]; // Get corresponding USASTATE
+				USstate = USASTATE; // Update the USstate variable
+				console.log("Selected US state:", USASTATE_verbose);
+				console.log("Selected USASTATE:", USASTATE);
+			});
+			
+			DropdownCommodity.on("change", function () {
+				const COMMODITY2_verbose = this.value; // Get the selected COMMODITY2_verbose
+				const COMMODITY2 = commodityMap[COMMODITY2_verbose]; // Get corresponding COMMODITY2
+				Commodity = COMMODITY2; // Update the Commodity variable
+				console.log("Selected Commodity (Verbose):", COMMODITY2_verbose);
+				console.log("Selected Commodity (COMMODITY2):", COMMODITY2);
+			});
+			
+			DropdownDF.on("change", function () {
+				DF = this.value;
+				console.log("Selected Domestic Foreign Code:", DF);
+			});
+		
+			DropdownContCode.on("change", function () {
+				ContCode = this.value;
+				console.log("Selected Container Code:", ContCode);
+			});
+		
+			// ------------Event listeners for the input fields-------------
+			d3.select("#SHIPWT").on("blur", function () {
+				ShipWt = this.value;
+				console.log("Shipping Weight:", ShipWt);
+			});
+			
+			d3.select("#FREIGHT_CHARGES").on("blur", function () {
+				FreightCharges = this.value;
+				console.log("Freight Charges (USD):", FreightCharges);
+			});
+			
+			d3.select("#VALUE").on("blur", function () {
+				Value = this.value;
+				console.log("Value of Goods (USD):", Value);
+			});
+
+            //----------------string code to build URL for API call--------------
+            const URLstring1 = "http://localhost:8000/getMode/?MEXSTATE_CANPROV=";
+            const URLstring2 = "&USASTATE=";
+            const URLstring3 = "&SHIPWT=";
+            const URLstring4 = "&FREIGHT_CHARGES=";
+            const URLstring5 = "&VALUE=";
+            const URLstring6 = "&COMMODITY2="; 
+            const URLstring7 = "&MONTH=";
+            const URLstring8 = "&YEAR=";  
+            const URLstring9 = "&DF=";
+            const URLstring10 = "&CONTCODE=";
+            
+            //------------Event listener for Submit button-----------------
+            document.getElementById('SubmitButton').addEventListener('click', function () {
+                document.getElementById("SubmitButton").disabled = true;
+                let MexCan_verbose = document.getElementById("origin").value;
+                let USstate_verbose = document.getElementById("destination").value;
+
+                // Map verbose names to internal codes using mapping objects
+                let MexCan = MexCanMap[MexCan_verbose];
+                let USstate = USstateMap[USstate_verbose];
+                console.log("Verbose MexCan:", MexCan_verbose);
+                console.log("Mapped MexCan code:", MexCan);
+                console.log("Verbose US:", USstate_verbose);
+                console.log("Mapped US code:", USstate);
+                //-----------URL for API--------------
+                const URLstring = URLstring1.concat(MexCan,URLstring2,USstate,URLstring3,ShipWt,URLstring4,FreightCharges,URLstring5,Value,URLstring6,Commodity,URLstring7,Month,URLstring8,Year,URLstring9,DF,URLstring10,ContCode);
+                // console.log(URLstring);
+                getRecommendation(URLstring); // Get recommendation from API
+                getSQLdata(MexCan,USstate,Commodity,DF,ShipWt); 
+                
+                document.getElementById("chart-container-div").style.display = "block";
+
+            });
+        });
+
+        config = {locateFile: filename => `/dist/${filename}`}
+    
+    </script>
+</body>
+</html>
